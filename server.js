@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -10,6 +11,9 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static assets (HTML, CSS, JS, images) from current directory
+app.use(express.static(__dirname));
 
 // MySQL Connection Pool Configuration
 const dbConfig = {
@@ -42,8 +46,13 @@ async function initDatabase() {
     }
 }
 
-// Root Health Check
+// Serve Frontend Homepage
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// API Health Check Endpoint
+app.get('/api/health', (req, res) => {
     res.json({ status: 'Online', message: 'ExamSync SWC3633 API Engine Connected to Database' });
 });
 
