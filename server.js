@@ -17,10 +17,10 @@ app.use(express.static(__dirname));
 
 // MySQL Connection Pool Configuration
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || 'zephyr.proxy.rlwy.net',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'Danziq123',
-    database: process.env.DB_NAME || 'exam_management',
+    password: process.env.DB_PASSWORD || 'OhPDdVyUTjakChWZEFQegtEnwBrCeEpM',
+    database: process.env.DB_NAME || 'ExamSync',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
