@@ -8,14 +8,10 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
-
-// Serve static assets (HTML, CSS, JS, images) from current directory
 app.use(express.static(__dirname));
 
-// MySQL Connection Pool Configuration
 const dbConfig = {
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT) || 3306,
@@ -29,75 +25,53 @@ const dbConfig = {
 
 let pool;
 
-// Initialize Database & Connect
 async function initDatabase() {
     try {
         pool = mysql.createPool(dbConfig);
         const connection = await pool.getConnection();
         console.log(`Successfully connected to MySQL database: "${dbConfig.database}"`);
         connection.release();
-
-        // Check user count in existing table
         const [users] = await pool.query('SELECT COUNT(*) as count FROM users');
         console.log(`Connected! Found ${users[0].count} existing user records in "users" table.`);
-
     } catch (err) {
         console.error('Database Connection Error:', err.message);
-        console.error('Please verify DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in .env file.');
     }
 }
 
-// Serve Frontend Homepage
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// API Health Check Endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'Online', message: 'ExamSync SWC3633 API Engine Connected to Database' });
 });
 
 // ================= USER ENDPOINTS =================
 
-// POST /api/login - Authenticate user credentials against database
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
-
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required.' });
     }
-
     try {
         const [rows] = await pool.query(
-            `SELECT 
-                user_id AS id, 
-                full_name AS name, 
-                email, 
-                password,
-                role, 
-                student_id AS studentMatricNo 
-            FROM users 
-            WHERE LOWER(email) = LOWER(?)`,
+            `SELECT user_id AS id, full_name AS name, email, password, role, student_id AS studentMatricNo
+             FROM users WHERE LOWER(email) = LOWER(?)`,
             [email]
         );
-
         if (rows.length === 0) {
             return res.status(401).json({ error: 'Invalid email address or password.' });
         }
-
         const user = rows[0];
-
         let isMatch = false;
         if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
             isMatch = await bcrypt.compare(password, user.password);
         } else {
             isMatch = (password === user.password);
         }
-
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid email address or password.' });
         }
-
         delete user.password;
         res.json({ message: 'Login successful', user });
     } catch (err) {
@@ -105,42 +79,29 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// GET /api/users - Fetch all users
 app.get('/api/users', async (req, res) => {
     try {
-        const [rows] = await pool.query(`
-            SELECT 
-                user_id AS id, 
-                full_name AS name, 
-                email, 
-                role, 
-                student_id AS studentMatricNo 
-            FROM users 
-            ORDER BY user_id ASC
-        `);
+        const [rows] = await pool.query(
+            `SELECT user_id AS id, full_name AS name, email, role, student_id AS studentMatricNo
+             FROM users ORDER BY user_id ASC`
+        );
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// POST /api/users - Add a new user with hashed password
 app.post('/api/users', async (req, res) => {
     const { fullName, email, password, role, studentId } = req.body;
-
     if (!fullName || !email || !password || !role) {
         return res.status(400).json({ error: 'Full name, email, password, and role are required.' });
     }
-
     try {
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-
+        const hashedPassword = await bcrypt.hash(password, 10);
         const [result] = await pool.query(
             'INSERT INTO users (full_name, email, password, role, student_id) VALUES (?, ?, ?, ?, ?)',
             [fullName, email, hashedPassword, role, studentId || null]
         );
-
         const newUser = {
             id: result.insertId,
             name: fullName,
@@ -148,7 +109,6 @@ app.post('/api/users', async (req, res) => {
             role,
             studentMatricNo: studentId || null
         };
-
         res.status(201).json({ message: 'User created successfully in database', user: newUser });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -158,21 +118,16 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-// DELETE /api/users/:id - Delete a user account
 app.delete('/api/users/:id', async (req, res) => {
     const { id } = req.params;
-
     if (!id || isNaN(id)) {
         return res.status(400).json({ error: 'Valid user ID is required.' });
     }
-
     try {
         const [result] = await pool.query('DELETE FROM users WHERE user_id = ?', [id]);
-
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: `User with ID ${id} not found.` });
         }
-
         return res.status(200).json({ success: true, message: `User #${id} deleted successfully.` });
     } catch (err) {
         if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
@@ -188,16 +143,11 @@ app.delete('/api/users/:id', async (req, res) => {
 
 app.get('/api/courses', async (req, res) => {
     try {
-        const [rows] = await pool.query(`
-            SELECT 
-                course_id AS id, 
-                course_code AS code, 
-                course_name AS title, 
-                credit_hour AS credits, 
-                faculty 
-            FROM courses 
-            ORDER BY course_id ASC
-        `);
+        const [rows] = await pool.query(
+            `SELECT course_id AS id, course_code AS code, course_name AS title,
+                    credit_hour AS credits, faculty
+             FROM courses ORDER BY course_id ASC`
+        );
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -217,21 +167,16 @@ app.post('/api/courses', async (req, res) => {
     }
 });
 
-// DELETE /api/courses/:id - Delete a course
 app.delete('/api/courses/:id', async (req, res) => {
     const { id } = req.params;
-
     if (!id || isNaN(id)) {
         return res.status(400).json({ error: 'Valid course ID is required.' });
     }
-
     try {
         const [result] = await pool.query('DELETE FROM courses WHERE course_id = ?', [id]);
-
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: `Course with ID ${id} not found.` });
         }
-
         return res.status(200).json({ success: true, message: `Course #${id} deleted successfully.` });
     } catch (err) {
         if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
@@ -247,15 +192,10 @@ app.delete('/api/courses/:id', async (req, res) => {
 
 app.get('/api/venues', async (req, res) => {
     try {
-        const [rows] = await pool.query(`
-            SELECT 
-                venue_id AS venueId, 
-                venue_name AS name, 
-                building, 
-                capacity 
-            FROM venues 
-            ORDER BY venue_id ASC
-        `);
+        const [rows] = await pool.query(
+            `SELECT venue_id AS venueId, venue_name AS name, building, capacity
+             FROM venues ORDER BY venue_id ASC`
+        );
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -275,21 +215,16 @@ app.post('/api/venues', async (req, res) => {
     }
 });
 
-// DELETE /api/venues/:id - Delete a venue
 app.delete('/api/venues/:id', async (req, res) => {
     const { id } = req.params;
-
     if (!id || isNaN(id)) {
         return res.status(400).json({ error: 'Valid venue ID is required.' });
     }
-
     try {
         const [result] = await pool.query('DELETE FROM venues WHERE venue_id = ?', [id]);
-
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: `Venue with ID ${id} not found.` });
         }
-
         return res.status(200).json({ success: true, message: `Venue #${id} deleted successfully.` });
     } catch (err) {
         if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
@@ -306,21 +241,14 @@ app.delete('/api/venues/:id', async (req, res) => {
 app.get('/api/examinations', async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT 
-                e.examination_id AS id, 
-                e.course_id AS courseId, 
-                c.course_code AS courseCode, 
-                c.course_name AS title, 
-                e.venue_id AS venueId, 
-                v.venue_name AS venue, 
-                v.building, 
-                DATE_FORMAT(e.exam_date, '%Y-%m-%d') AS date, 
-                e.start_time AS startTime, 
-                e.end_time AS endTime, 
-                e.exam_type AS examType, 
-                'Scheduled' AS status 
-            FROM examinations e 
-            LEFT JOIN courses c ON e.course_id = c.course_id 
+            SELECT e.examination_id AS id, e.course_id AS courseId,
+                   c.course_code AS courseCode, c.course_name AS title,
+                   e.venue_id AS venueId, v.venue_name AS venue, v.building,
+                   DATE_FORMAT(e.exam_date, '%Y-%m-%d') AS date,
+                   e.start_time AS startTime, e.end_time AS endTime,
+                   e.exam_type AS examType, 'Scheduled' AS status
+            FROM examinations e
+            LEFT JOIN courses c ON e.course_id = c.course_id
             LEFT JOIN venues v ON e.venue_id = v.venue_id
             ORDER BY e.exam_date ASC
         `);
@@ -343,21 +271,16 @@ app.post('/api/examinations', async (req, res) => {
     }
 });
 
-// DELETE /api/examinations/:id - Delete an examination record
 app.delete('/api/examinations/:id', async (req, res) => {
     const { id } = req.params;
-
     if (!id || isNaN(id)) {
         return res.status(400).json({ error: 'Valid examination ID is required.' });
     }
-
     try {
         const [result] = await pool.query('DELETE FROM examinations WHERE examination_id = ?', [id]);
-
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: `Examination with ID ${id} not found.` });
         }
-
         return res.status(200).json({ success: true, message: `Examination #${id} deleted successfully.` });
     } catch (err) {
         if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
@@ -374,20 +297,14 @@ app.delete('/api/examinations/:id', async (req, res) => {
 app.get('/api/results', async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT 
-                r.result_id AS id, 
-                r.student_id AS studentUserId, 
-                u.full_name AS studentName, 
-                u.student_id AS studentMatricNo, 
-                r.examination_id AS examinationId, 
-                c.course_code AS courseCode, 
-                c.course_name AS courseName, 
-                r.marks, 
-                r.grade, 
-                r.status 
-            FROM results r 
-            LEFT JOIN users u ON r.student_id = u.user_id 
-            LEFT JOIN examinations e ON r.examination_id = e.examination_id 
+            SELECT r.result_id AS id, r.student_id AS studentUserId,
+                   u.full_name AS studentName, u.student_id AS studentMatricNo,
+                   r.examination_id AS examinationId,
+                   c.course_code AS courseCode, c.course_name AS courseName,
+                   r.marks, r.grade, r.status
+            FROM results r
+            LEFT JOIN users u ON r.student_id = u.user_id
+            LEFT JOIN examinations e ON r.examination_id = e.examination_id
             LEFT JOIN courses c ON e.course_id = c.course_id
         `);
         res.json(rows);
@@ -425,18 +342,14 @@ app.post('/api/results', async (req, res) => {
 app.get('/api/registrations', async (req, res) => {
     try {
         const [rows] = await pool.query(`
-            SELECT 
-                reg.registration_id AS regId, 
-                reg.student_id AS studentId, 
-                u.full_name AS studentName, 
-                u.student_id AS matricNo, 
-                reg.course_id AS courseId, 
-                c.course_code AS courseCode, 
-                c.course_name AS courseName, 
-                reg.semester, 
-                DATE_FORMAT(reg.registration_date, '%Y-%m-%d') AS registrationDate 
-            FROM registrations reg 
-            LEFT JOIN users u ON reg.student_id = u.user_id 
+            SELECT reg.registration_id AS regId, reg.student_id AS studentId,
+                   u.full_name AS studentName, u.student_id AS matricNo,
+                   reg.course_id AS courseId,
+                   c.course_code AS courseCode, c.course_name AS courseName,
+                   reg.semester,
+                   DATE_FORMAT(reg.registration_date, '%Y-%m-%d') AS registrationDate
+            FROM registrations reg
+            LEFT JOIN users u ON reg.student_id = u.user_id
             LEFT JOIN courses c ON reg.course_id = c.course_id
         `);
         res.json(rows);
@@ -458,24 +371,77 @@ app.post('/api/registrations', async (req, res) => {
     }
 });
 
-// DELETE /api/registrations/:id - Delete a registration record
 app.delete('/api/registrations/:id', async (req, res) => {
     const { id } = req.params;
-
     if (!id || isNaN(id)) {
         return res.status(400).json({ error: 'Valid registration ID is required.' });
     }
-
     try {
         const [result] = await pool.query('DELETE FROM registrations WHERE registration_id = ?', [id]);
-
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: `Registration with ID ${id} not found.` });
         }
-
         return res.status(200).json({ success: true, message: `Registration #${id} deleted successfully.` });
     } catch (err) {
         return res.status(500).json({ error: err.message });
+    }
+});
+
+// ================= QR VERIFICATION PAGE =================
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function verifyPage(title, color, body) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ExamSync Verification</title></head>
+    <body style="font-family:monospace;background:#008080;padding:16px">
+      <div style="max-width:480px;margin:auto;background:#c0c0c0;border:2px solid #000;padding:16px">
+        <h2 style="margin-top:0">EXAMSYNC - EXAM SLIP VERIFICATION</h2>
+        <div style="background:${color};color:#fff;padding:8px;font-weight:bold">${title}</div>
+        ${body}
+      </div></body></html>`;
+}
+
+app.get('/verify/:matric', async (req, res) => {
+    try {
+        const [users] = await pool.query(
+            "SELECT user_id, full_name, student_id FROM users WHERE student_id = ? AND role = 'Student'",
+            [req.params.matric]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).send(verifyPage('✘ INVALID - STUDENT NOT FOUND', '#b00020', ''));
+        }
+
+        const u = users[0];
+        const [exams] = await pool.query(`
+            SELECT c.course_code, c.course_name,
+                   DATE_FORMAT(e.exam_date, '%Y-%m-%d') AS date,
+                   e.start_time, e.end_time, v.venue_name, v.building
+            FROM registrations r
+            JOIN courses c ON c.course_id = r.course_id
+            JOIN examinations e ON e.course_id = r.course_id
+            LEFT JOIN venues v ON v.venue_id = e.venue_id
+            WHERE r.student_id = ?
+            ORDER BY e.exam_date`, [u.user_id]);
+
+        const rows = exams.map(x => `
+            <tr><td>${esc(x.course_code)}<br><small>${esc(x.course_name)}</small></td>
+                <td>${esc(x.date)}<br><small>${esc(x.start_time)} - ${esc(x.end_time)}</small></td>
+                <td>${esc(x.venue_name)}<br><small>${esc(x.building)}</small></td></tr>`).join('');
+
+        res.send(verifyPage('✔ VERIFIED STUDENT', '#006400', `
+            <p><b>Name:</b> ${esc(u.full_name)}<br><b>Matric No:</b> ${esc(u.student_id)}</p>
+            <table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;background:#fff;font-size:12px">
+              <tr><th>Course</th><th>Date / Time</th><th>Venue</th></tr>
+              ${rows || '<tr><td colspan="3">No registered exams found.</td></tr>'}
+            </table>`));
+    } catch (err) {
+        res.status(500).send(verifyPage('ERROR: ' + esc(err.message), '#b00020', ''));
     }
 });
 
