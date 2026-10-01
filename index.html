@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamSync - SWC3633 Exam Scheduling & Result Management System</title>
+    <link rel="icon" type="image/svg" href="logo.svg">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Retro Vibe -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"Courier Prime"', 'monospace'],
+                        pixel: ['"VT323"', 'monospace'],
+                        serif: ['"Times New Roman"', 'Times', 'serif']
+                    },
+                    colors: {
+                        win: {
+                            bg: '#008080',      
+                            gray: '#c0c0c0',     
+                            dark: '#808080',     
+                            darker: '#404040',   
+                            navy: '#000080',     
+                            navylight: '#1084d0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Classic Bevel Utility Classes */
+        .win-outset {
+            background-color: #c0c0c0;
+            border-top: 2px solid #ffffff;
+            border-left: 2px solid #ffffff;
+            border-right: 2px solid #404040;
+            border-bottom: 2px solid #404040;
+            box-shadow: inset -1px -1px #808080, inset 1px 1px #dfdfdf;
+        }
+
+        .win-inset {
+            background-color: #ffffff;
+            border-top: 2px solid #808080;
+            border-left: 2px solid #808080;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            box-shadow: inset 1px 1px #000000, inset -1px -1px #dfdfdf;
+        }
+
+        .win-button {
+            background-color: #c0c0c0;
+            border-top: 2px solid #ffffff;
+            border-left: 2px solid #ffffff;
+            border-right: 2px solid #000000;
+            border-bottom: 2px solid #000000;
+            box-shadow: inset -1px -1px #808080, inset 1px 1px #dfdfdf;
+        }
+
+        .win-button:active {
+            border-top: 2px solid #000000;
+            border-left: 2px solid #000000;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            box-shadow: inset 1px 1px #808080;
+            padding-top: 1px;
+            padding-left: 1px;
+        }
+
+        /* Retro Table Gridlines */
+        .win-table th, .win-table td {
+            border: 1px solid #808080;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; }
+        }
+    </style>
+</head>
+<body class="bg-win-bg font-mono text-black antialiased min-h-screen flex flex-col p-2 sm:p-4">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Navigation Header / Windows App Header -->
+    <header class="win-outset p-1 mb-4 no-print">
+        <!-- Title Bar -->
+        <div class="bg-gradient-to-r from-win-navy to-win-navylight p-1.5 flex items-center justify-between text-white font-bold">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-yellow-300"></i>
+                <span class="text-sm tracking-wide">EXAMSYNC_V1.0.EXE - [SWC3633 SYSTEM]</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <button class="win-button px-2 py-0.5 text-xs text-black font-bold">_</button>
+                <button class="win-button px-2 py-0.5 text-xs text-black font-bold">☐</button>
+                <button class="win-button px-2 py-0.5 text-xs text-black font-bold text-red-700">X</button>
+            </div>
+        </div>
+
+        <!-- Menu / App Header Info -->
+        <div class="p-2 flex flex-wrap items-center justify-between gap-2 text-xs border-b border-win-dark">
+            <div class="flex items-center gap-4">
+                <span class="font-bold underline cursor-pointer"><u>F</u>ile</span>
+                <span class="font-bold underline cursor-pointer"><u>E</u>dit</span>
+                <span class="font-bold underline cursor-pointer"><u>V</u>iew</span>
+                <span class="font-bold underline cursor-pointer"><u>H</u>elp</span>
+            </div>
+
+            <!-- Logged-in User Profile -->
+            <div class="flex items-center gap-3">
+                <div id="userProfileHeader" class="hidden items-center gap-2">
+                    <div id="userAvatar" class="w-6 h-6 win-outset font-bold flex items-center justify-center text-xs bg-amber-200">
+                        U
+                    </div>
+                    <div class="text-left text-xs">
+                        <span id="userNameDisplay" class="font-bold">User Name</span>
+                        <span id="userRoleBadge" class="text-[10px] text-win-navy block font-semibold">[Role]</span>
+                    </div>
+                    <button onclick="logout()" title="Logout" class="win-button px-2 py-1 text-xs text-red-700 font-bold ml-1">
+                        <i class="fa-solid fa-power-off"></i> Exit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto">
+
+        <!-- ================= SECTION: LOGIN SCREEN ================= -->
+        <section id="loginSection" class="max-w-md mx-auto my-12">
+            <div class="win-outset p-1">
+                <!-- Window Title Bar -->
+                <div class="bg-win-navy text-white px-2 py-1 font-bold text-sm flex items-center justify-between">
+                    <span>User Authentication - ExamSync</span>
+                    <span class="text-xs">SYS_LOG_01</span>
+                </div>
+
+                <div class="p-6 space-y-4">
+                    <div class="win-inset p-3 bg-amber-50 text-xs text-black border border-amber-300 flex items-center gap-3">
+                        <i class="fa-solid fa-key text-2xl text-amber-600"></i>
+                        <div>
+                            <p class="font-bold">ExamSync</p>
+                            <p class="text-[11px]">Please enter authorized security credentials to proceed.</p>
+                        </div>
+                    </div>
+
+                    <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4 text-xs font-bold">
+                        <div>
+                            <label class="block mb-1">USER EMAIL ADDRESS:</label>
+                            <input type="email" id="loginEmail" required placeholder="admin@university.edu" class="win-inset w-full p-2 outline-none font-mono">
+                        </div>
+
+                        <div>
+                            <label class="block mb-1">ACCESS PASSWORD:</label>
+                            <input type="password" id="loginPassword" required placeholder="••••••••" class="win-inset w-full p-2 outline-none font-mono">
+                        </div>
+
+                        <div class="pt-2 flex justify-end gap-2">
+                            <button type="submit" class="win-button px-6 py-2 text-xs font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-right-to-bracket"></i> [ LOGIN ]
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION: DASHBOARD CONTAINER ================= -->
+        <section id="dashboardSection" class="hidden space-y-4">
+            
+            <!-- Dynamic Role Navigation Tabs -->
+            <div class="win-outset p-2 flex flex-wrap items-center justify-between gap-2 no-print">
+                <nav id="roleNavTabs" class="flex flex-wrap gap-1">
+                    <!-- Nav buttons rendered dynamically based on logged role -->
+                </nav>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: STUDENT VIEW ---------------- -->
+            <div id="tabStudentView" class="space-y-4 hidden">
+                <!-- Welcome Banner -->
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-2 flex justify-between items-center">
+                        <span class="font-bold text-sm" id="studentWelcomeTitle">Welcome back, Student</span>
+                        <span class="text-xs bg-yellow-400 text-black px-1.5 font-bold">STUDENT PORTAL</span>
+                    </div>
+                    <div class="p-3 bg-gray-200 text-xs">
+                        View scheduled final examinations, check published grade rosters, and issue official hall entry slips.
+                    </div>
+                </div>
+
+                <!-- Exam Schedule & Results Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <!-- Student Exam Schedule List -->
+                    <div class="lg:col-span-2 win-outset p-1 space-y-2">
+                        <div class="bg-gray-300 p-2 font-bold text-xs flex items-center justify-between border-b border-win-dark">
+                            <span><i class="fa-regular fa-calendar-check mr-1"></i> EXAMINATION TIMETABLE</span>
+                            <button onclick="openExamSlipModal()" class="win-button px-2 py-1 text-xs font-bold">
+                                <i class="fa-solid fa-print mr-1"></i> Print Exam Slip
+                            </button>
+                        </div>
+                        <div class="p-2 overflow-x-auto">
+                            <table class="w-full text-left win-table text-xs bg-white">
+                                <thead>
+                                    <tr class="bg-win-gray font-bold text-black border-b border-black">
+                                        <th class="p-2">Course Code & Title</th>
+                                        <th class="p-2">Date / Window</th>
+                                        <th class="p-2">Venue Location</th>
+                                        <th class="p-2">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentExamTableBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Student Results Card -->
+                    <div class="win-outset p-1 space-y-2">
+                        <div class="bg-gray-300 p-2 font-bold text-xs border-b border-win-dark flex items-center justify-between">
+                            <span><i class="fa-solid fa-award mr-1"></i> GRADE RESULTS</span>
+                            <span class="text-[10px] bg-white px-1 border border-black">OFFICIAL</span>
+                        </div>
+                        <div id="studentResultsList" class="p-2 space-y-2 text-xs">
+                            <!-- Dynamic Result Cards -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: LECTURER VIEW ---------------- -->
+            <div id="tabLecturerView" class="space-y-4 hidden">
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-1.5 font-bold text-xs flex justify-between items-center">
+                        <span>LECTURER EVALUATION & GRADE ROSTER</span>
+                        <button onclick="openGradeModal()" class="win-button text-black px-3 py-0.5 text-xs font-bold">
+                            + Record Student Grade
+                        </button>
+                    </div>
+                    <div class="p-3 bg-gray-200 text-xs">
+                        Record and publish examination marks for candidates. Grades and pass/fail status are calculated by server core.
+                    </div>
+                </div>
+
+                <!-- Academic Results Master Table -->
+                <div class="win-outset p-1">
+                    <div class="p-2 bg-win-gray border-b border-win-dark flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span class="font-bold">PUBLISHED ACADEMIC RESULTS DATABASE</span>
+                        <div class="flex items-center gap-1">
+                            <label class="font-bold">FILTER:</label>
+                            <input type="text" id="resultSearchInput" onkeyup="filterResultsTable()" placeholder="Search student/course..." class="win-inset px-2 py-1 text-xs outline-none">
+                        </div>
+                    </div>
+                    <div class="p-2 overflow-x-auto">
+                        <table class="w-full text-left win-table text-xs bg-white">
+                            <thead>
+                                <tr class="bg-win-gray font-bold">
+                                    <th class="p-2">Result ID</th>
+                                    <th class="p-2">Student Name</th>
+                                    <th class="p-2">Course Code</th>
+                                    <th class="p-2">Marks</th>
+                                    <th class="p-2">Grade</th>
+                                    <th class="p-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lecturerResultsTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: ADMIN EXAMINATIONS ---------------- -->
+            <div id="tabAdminExams" class="space-y-4 hidden">
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-1.5 font-bold text-xs flex justify-between items-center">
+                        <span>MASTER EXAMINATION SCHEDULE DIRECTORY</span>
+                        <button onclick="openScheduleExamModal()" class="win-button text-black px-3 py-0.5 text-xs font-bold">
+                            + Schedule New Exam
+                        </button>
+                    </div>
+                    <div class="p-2">
+                        <table class="w-full text-left win-table text-xs bg-white">
+                            <thead>
+                                <tr class="bg-win-gray font-bold">
+                                    <th class="p-2">ID</th>
+                                    <th class="p-2">Course Module</th>
+                                    <th class="p-2">Venue</th>
+                                    <th class="p-2">Date</th>
+                                    <th class="p-2">Time Slot</th>
+                                    <th class="p-2">Type</th>
+                                    <th class="p-2 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminExamsTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: ADMIN COURSES ---------------- -->
+            <div id="tabAdminCourses" class="space-y-4 hidden">
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-1.5 font-bold text-xs flex justify-between items-center">
+                        <span>COURSE MODULE DATABASE</span>
+                        <button onclick="openAddCourseModal()" class="win-button text-black px-3 py-0.5 text-xs font-bold">
+                            + Add New Course
+                        </button>
+                    </div>
+                    <div class="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="coursesGrid">
+                        <!-- Dynamic course cards -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: ADMIN VENUES ---------------- -->
+            <div id="tabAdminVenues" class="space-y-4 hidden">
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-1.5 font-bold text-xs flex justify-between items-center">
+                        <span>EXAMINATION HALL & VENUE REGISTRY</span>
+                        <button onclick="openAddVenueModal()" class="win-button text-black px-3 py-0.5 text-xs font-bold">
+                            + Add Venue
+                        </button>
+                    </div>
+                    <div class="p-3 grid grid-cols-1 md:grid-cols-3 gap-3" id="venuesGrid">
+                        <!-- Dynamic venue cards -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: ADMIN REGISTRATIONS ---------------- -->
+            <div id="tabAdminRegistrations" class="space-y-4 hidden">
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-1.5 font-bold text-xs flex justify-between items-center">
+                        <span>STUDENT COURSE ENROLLMENT RECORDS</span>
+                        <button onclick="openAddRegistrationModal()" class="win-button text-black px-3 py-0.5 text-xs font-bold">
+                            + Register Student Course
+                        </button>
+                    </div>
+                    <div class="p-2">
+                        <table class="w-full text-left win-table text-xs bg-white">
+                            <thead>
+                                <tr class="bg-win-gray font-bold">
+                                    <th class="p-2">Reg ID</th>
+                                    <th class="p-2">Student</th>
+                                    <th class="p-2">Matric No</th>
+                                    <th class="p-2">Course</th>
+                                    <th class="p-2">Semester</th>
+                                    <th class="p-2">Date</th>
+                                    <th class="p-2 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="registrationsTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------------- TAB CONTENT: ADMIN USERS ---------------- -->
+            <div id="tabAdminUsers" class="space-y-4 hidden">
+                <div class="win-outset p-1">
+                    <div class="bg-win-navy text-white p-1.5 font-bold text-xs flex justify-between items-center">
+                        <span>SYSTEM ACCOUNTS & USER SECURITY DIRECTORY</span>
+                        <button onclick="openAddUserModal()" class="win-button text-black px-3 py-0.5 text-xs font-bold">
+                            + Create User Account
+                        </button>
+                    </div>
+                    <div class="p-2">
+                        <table class="w-full text-left win-table text-xs bg-white">
+                            <thead>
+                                <tr class="bg-win-gray font-bold">
+                                    <th class="p-2">ID</th>
+                                    <th class="p-2">Full Name</th>
+                                    <th class="p-2">Email</th>
+                                    <th class="p-2">Role</th>
+                                    <th class="p-2">Matric / Student ID</th>
+                                    <th class="p-2 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- ================= MODAL: EXAM SLIP WITH QR CODE ================= -->
+    <div id="examSlipModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-lg w-full p-1 my-auto">
+            <div class="bg-win-navy p-1 text-white flex items-center justify-between no-print font-bold text-xs">
+                <span>OFFICIAL_EXAM_SLIP_VERIFICATION.DOC</span>
+                <div class="flex items-center gap-1">
+                    <button onclick="window.print()" class="win-button px-2 py-0.5 text-black text-xs font-bold">Print</button>
+                    <button onclick="closeModal('examSlipModal')" class="win-button px-2 py-0.5 text-red-700 text-xs font-bold">X</button>
+                </div>
+            </div>
+
+            <!-- Printable Slip Document Body -->
+            <div id="printableSlipArea" class="p-6 bg-white space-y-4 border border-black m-2">
+                <div class="text-center border-b-2 border-black pb-2 font-serif">
+                    <h2 class="font-bold text-lg tracking-tight">UNIVERSITI POLY-TECH MALAYSIA</h2>
+                    <p class="text-xs uppercase font-mono font-bold">OFFICIAL EXAMINATION ENTRY DOCKET</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div>
+                        <span class="block text-gray-500">STUDENT NAME:</span>
+                        <span id="slipStudentName" class="font-bold text-black">Muhammad Ali</span>
+                    </div>
+                    <div>
+                        <span class="block text-gray-500">MATRIC NO:</span>
+                        <span id="slipStudentId" class="font-bold text-black">ST001</span>
+                    </div>
+                    <div>
+                        <span class="block text-gray-500">SESSION:</span>
+                        <span class="font-bold text-black">2026/2027-1</span>
+                    </div>
+                    <div>
+                        <span class="block text-gray-500">STATUS:</span>
+                        <span class="bg-black text-white px-1 font-bold">VERIFIED</span>
+                    </div>
+                </div>
+
+                <!-- Third-Party QR Code API Integration -->
+                <div class="win-inset p-3 bg-gray-100 flex items-center gap-3">
+                    <div class="w-24 h-24 bg-white p-1 border border-black flex-shrink-0">
+                        <img id="slipQrCodeImg" src="" alt="Exam QR Verification" class="w-full h-full object-contain">
+                    </div>
+                    <div class="text-[11px] font-mono space-y-1">
+                        <span class="bg-win-navy text-white px-1 font-bold">3RD-PARTY QR VERIFIED</span>
+                        <p class="font-bold">Security Token Gate</p>
+                        <p class="text-gray-600">Present this QR image code to chief invigilator upon entering examination hall.</p>
+                    </div>
+                </div>
+
+                <div class="text-[10px] text-gray-500 text-center font-mono border-t border-dashed border-black pt-2">
+                    GENERATED AUTOMATICALLY VIA EXAMSYNC RESTFUL ENGINE
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: RECORD STUDENT GRADE ================= -->
+    <div id="gradeModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-md w-full p-1">
+            <div class="bg-win-navy text-white px-2 py-1 font-bold text-xs flex justify-between items-center">
+                <span>Record Grade - Academic Module</span>
+                <button onclick="closeModal('gradeModal')" class="win-button px-1.5 py-0.5 text-black font-bold">X</button>
+            </div>
+            <form onsubmit="handleSaveGrade(event)" class="p-4 space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block mb-1">STUDENT CANDIDATE:</label>
+                    <select id="gradeStudentSelect" required class="win-inset w-full p-2 outline-none font-mono"></select>
+                </div>
+                <div>
+                    <label class="block mb-1">EXAMINATION / COURSE:</label>
+                    <select id="gradeExamSelect" required class="win-inset w-full p-2 outline-none font-mono"></select>
+                </div>
+                <div>
+                    <label class="block mb-1">MARKS (0 - 100):</label>
+                    <input type="number" min="0" max="100" id="gradeMarksInput" required placeholder="85" class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('gradeModal')" class="win-button px-4 py-1.5 font-bold">Cancel</button>
+                    <button type="submit" class="win-button px-4 py-1.5 font-bold">Save Result</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: SCHEDULE NEW EXAM ================= -->
+    <div id="scheduleExamModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-md w-full p-1">
+            <div class="bg-win-navy text-white px-2 py-1 font-bold text-xs flex justify-between items-center">
+                <span>Schedule Examination Entry</span>
+                <button onclick="closeModal('scheduleExamModal')" class="win-button px-1.5 py-0.5 text-black font-bold">X</button>
+            </div>
+            <form onsubmit="handleScheduleExam(event)" class="p-4 space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block mb-1">COURSE MODULE:</label>
+                    <select id="examCourseSelect" required class="win-inset w-full p-2 outline-none font-mono"></select>
+                </div>
+                <div>
+                    <label class="block mb-1">VENUE HALL:</label>
+                    <select id="examVenueSelect" required class="win-inset w-full p-2 outline-none font-mono"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">DATE:</label>
+                        <input type="date" id="examDateInput" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block mb-1">TYPE:</label>
+                        <input type="text" id="examTypeInput" value="Final Examination" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">START TIME:</label>
+                        <input type="time" id="examStartTimeInput" value="09:00" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block mb-1">END TIME:</label>
+                        <input type="time" id="examEndTimeInput" value="12:00" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('scheduleExamModal')" class="win-button px-4 py-1.5 font-bold">Cancel</button>
+                    <button type="submit" class="win-button px-4 py-1.5 font-bold">Schedule Exam</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: ADD COURSE ================= -->
+    <div id="addCourseModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-md w-full p-1">
+            <div class="bg-win-navy text-white px-2 py-1 font-bold text-xs flex justify-between items-center">
+                <span>Add Course Module</span>
+                <button onclick="closeModal('addCourseModal')" class="win-button px-1.5 py-0.5 text-black font-bold">X</button>
+            </div>
+            <form onsubmit="handleAddCourse(event)" class="p-4 space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block mb-1">COURSE CODE:</label>
+                    <input type="text" id="courseCodeInput" placeholder="SWC3633" required class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div>
+                    <label class="block mb-1">COURSE TITLE:</label>
+                    <input type="text" id="courseTitleInput" placeholder="Web API Development" required class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">CREDITS:</label>
+                        <input type="number" id="courseCreditsInput" value="3" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block mb-1">FACULTY:</label>
+                        <input type="text" id="courseFacultyInput" value="Faculty of Computing" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('addCourseModal')" class="win-button px-4 py-1.5 font-bold">Cancel</button>
+                    <button type="submit" class="win-button px-4 py-1.5 font-bold">Save Course</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: ADD VENUE ================= -->
+    <div id="addVenueModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-md w-full p-1">
+            <div class="bg-win-navy text-white px-2 py-1 font-bold text-xs flex justify-between items-center">
+                <span>Add Exam Hall Venue</span>
+                <button onclick="closeModal('addVenueModal')" class="win-button px-1.5 py-0.5 text-black font-bold">X</button>
+            </div>
+            <form onsubmit="handleAddVenue(event)" class="p-4 space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block mb-1">VENUE NAME:</label>
+                    <input type="text" id="venueNameInput" placeholder="Examination Hall 3" required class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">BUILDING BLOCK:</label>
+                        <input type="text" id="venueBuildingInput" placeholder="Block A" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block mb-1">CAPACITY:</label>
+                        <input type="number" id="venueCapacityInput" value="100" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('addVenueModal')" class="win-button px-4 py-1.5 font-bold">Cancel</button>
+                    <button type="submit" class="win-button px-4 py-1.5 font-bold">Save Venue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: REGISTER STUDENT COURSE ================= -->
+    <div id="addRegistrationModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-md w-full p-1">
+            <div class="bg-win-navy text-white px-2 py-1 font-bold text-xs flex justify-between items-center">
+                <span>Register Student Course Entry</span>
+                <button onclick="closeModal('addRegistrationModal')" class="win-button px-1.5 py-0.5 text-black font-bold">X</button>
+            </div>
+            <form onsubmit="handleAddRegistration(event)" class="p-4 space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block mb-1">STUDENT CANDIDATE:</label>
+                    <select id="regStudentSelect" required class="win-inset w-full p-2 outline-none font-mono"></select>
+                </div>
+                <div>
+                    <label class="block mb-1">COURSE MODULE:</label>
+                    <select id="regCourseSelect" required class="win-inset w-full p-2 outline-none font-mono"></select>
+                </div>
+                <div>
+                    <label class="block mb-1">SEMESTER CODE:</label>
+                    <input type="text" id="regSemesterInput" value="2026/2027-1" required class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('addRegistrationModal')" class="win-button px-4 py-1.5 font-bold">Cancel</button>
+                    <button type="submit" class="win-button px-4 py-1.5 font-bold">Save Registration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: ADD SYSTEM USER ================= -->
+    <div id="addUserModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="win-outset max-w-md w-full p-1">
+            <div class="bg-win-navy text-white px-2 py-1 font-bold text-xs flex justify-between items-center">
+                <span>Create System Account</span>
+                <button onclick="closeModal('addUserModal')" class="win-button px-1.5 py-0.5 text-black font-bold">X</button>
+            </div>
+            <form onsubmit="handleAddUser(event)" class="p-4 space-y-3 text-xs font-bold">
+                <div>
+                    <label class="block mb-1">FULL NAME:</label>
+                    <input type="text" id="userFullNameInput" placeholder="Dr. Ahmad Rahman" required class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div>
+                    <label class="block mb-1">EMAIL ADDRESS:</label>
+                    <input type="email" id="userEmailInput" placeholder="ahmad@university.edu" required class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block mb-1">PASSWORD:</label>
+                        <input type="password" id="userPasswordInput" value="student123" required class="win-inset w-full p-2 outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block mb-1">SYSTEM ROLE:</label>
+                        <select id="userRoleSelect" required class="win-inset w-full p-2 outline-none font-mono">
+                            <option value="Student">Student</option>
+                            <option value="Lecturer">Lecturer</option>
+                            <option value="Administrator">Administrator</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block mb-1">MATRIC / STUDENT ID (IF STUDENT):</label>
+                    <input type="text" id="userMatricInput" placeholder="ST006" class="win-inset w-full p-2 outline-none font-mono">
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('addUserModal')" class="win-button px-4 py-1.5 font-bold">Cancel</button>
+                    <button type="submit" class="win-button px-4 py-1.5 font-bold">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Retro Bottom Status Bar -->
+    <footer class="win-outset mt-4 p-1 flex items-center justify-between text-[11px] font-mono no-print">
+        <div class="win-inset px-2 py-0.5 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-600"></span> Ready
+        </div>
+        <div class="win-inset px-2 py-0.5 font-bold">
+            SWC3633 WEB API ENGINE v1.0
+        </div>
+    </footer>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        // API Base URL (Express server running on localhost:5000)
+        const API_BASE_URL = 'http://localhost:5000/api';
+
+        // State initialized completely empty to strictly fetch live database records
+        let state = {
+            currentUser: null,
+            users: [],
+            courses: [],
+            venues: [],
+            examinations: [],
+            results: [],
+            registrations: [],
+            isOnline: false
+        };
+
+        // --- INITIALIZATION ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            await checkApiStatus();
+            await fetchAllData();
+        });
+
+        async function checkApiStatus() {
+            try {
+                const res = await fetch(`${API_BASE_URL.replace('/api', '')}/`, { method: 'GET' });
+                if (res.ok) {
+                    state.isOnline = true;
+                }
+            } catch (err) {
+                state.isOnline = false;
+            }
+        }
+
+        async function fetchAllData() {
+            try {
+                const [uRes, cRes, vRes, eRes, rRes, regRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/users`),
+                    fetch(`${API_BASE_URL}/courses`),
+                    fetch(`${API_BASE_URL}/venues`),
+                    fetch(`${API_BASE_URL}/examinations`),
+                    fetch(`${API_BASE_URL}/results`),
+                    fetch(`${API_BASE_URL}/registrations`)
+                ]);
+
+                if (uRes.ok) state.users = await uRes.json();
+                if (cRes.ok) state.courses = await cRes.json();
+                if (vRes.ok) state.venues = await vRes.json();
+                if (eRes.ok) state.examinations = await eRes.json();
+                if (rRes.ok) state.results = await rRes.json();
+                if (regRes.ok) state.registrations = await regRes.json();
+            } catch (err) {
+                console.error('Failed to fetch data from API:', err);
+                showToast('Unable to load data from database.', 'error');
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showToast('Please enter both email and password.', 'error');
+                return;
+            }
+
+            try {
+                // Send authentication request to Express server
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.user) {
+                    state.currentUser = data.user;
+                    showToast(`Welcome back, ${data.user.name}!`, 'success');
+                    renderUserSession();
+                } else {
+                    showToast(data.error || 'Invalid credentials.', 'error');
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                showToast('Cannot connect to backend server. Is server.js running?', 'error');
+            }
+        }
+
+        function logout() {
+            state.currentUser = null;
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById('userProfileHeader').classList.add('hidden');
+            document.getElementById('userProfileHeader').classList.remove('flex');
+            showToast('Logged out successfully.', 'info');
+        }
+
+        function renderUserSession() {
+            const u = state.currentUser;
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.remove('hidden');
+
+            const header = document.getElementById('userProfileHeader');
+            header.classList.remove('hidden');
+            header.classList.add('flex');
+            document.getElementById('userNameDisplay').innerText = u.name;
+            document.getElementById('userRoleBadge').innerText = u.role;
+            document.getElementById('userAvatar').innerText = u.name.charAt(0).toUpperCase();
+
+            // Build dynamic Navigation Tabs based on role
+            const nav = document.getElementById('roleNavTabs');
+            nav.innerHTML = '';
+
+            if (u.role === 'Student') {
+                nav.innerHTML = `
+                    <button onclick="switchTab('tabStudentView')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-graduation-cap mr-1"></i> My Exam Timetable & Results
+                    </button>
+                `;
+                switchTab('tabStudentView');
+                renderStudentPortal();
+            } else if (u.role === 'Lecturer') {
+                nav.innerHTML = `
+                    <button onclick="switchTab('tabLecturerView')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-chalkboard-user mr-1"></i> Grade Entry & Roster
+                    </button>
+                `;
+                switchTab('tabLecturerView');
+                renderLecturerPortal();
+            } else {
+                // Administrator
+                nav.innerHTML = `
+                    <button onclick="switchTab('tabAdminExams')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-calendar-days mr-1"></i> Examinations
+                    </button>
+                    <button onclick="switchTab('tabAdminCourses')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-book-open mr-1"></i> Courses
+                    </button>
+                    <button onclick="switchTab('tabAdminVenues')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-building mr-1"></i> Venues
+                    </button>
+                    <button onclick="switchTab('tabAdminRegistrations')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-id-card mr-1"></i> Registrations
+                    </button>
+                    <button onclick="switchTab('tabAdminUsers')" class="tab-btn win-button px-3 py-1 text-xs font-bold">
+                        <i class="fa-solid fa-users mr-1"></i> Users
+                    </button>
+                `;
+                switchTab('tabAdminExams');
+                renderAdminPortal();
+            }
+        }
+
+        function switchTab(tabId) {
+            ['tabStudentView', 'tabLecturerView', 'tabAdminExams', 'tabAdminCourses', 'tabAdminVenues', 'tabAdminRegistrations', 'tabAdminUsers'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+
+            const active = document.getElementById(tabId);
+            if (active) active.classList.remove('hidden');
+
+            const buttons = document.querySelectorAll('#roleNavTabs button');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('onclick').includes(tabId)) {
+                    btn.className = 'tab-btn win-button px-3 py-1 text-xs font-bold bg-win-navy text-white';
+                } else {
+                    btn.className = 'tab-btn win-button px-3 py-1 text-xs font-bold text-black';
+                }
+            });
+        }
+
+        function renderStudentPortal() {
+            const u = state.currentUser;
+            document.getElementById('studentWelcomeTitle').innerText = `Welcome back, ${u.name}`;
+
+            // Render Exam Timetable
+            const tbody = document.getElementById('studentExamTableBody');
+            tbody.innerHTML = '';
+
+            state.examinations.forEach(exam => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-bold">
+                            <div class="text-win-navy">${exam.courseCode || 'SWC3633'}</div>
+                            <div class="text-[11px] font-normal">${exam.title || 'Course'}</div>
+                        </td>
+                        <td class="p-2">
+                            <div>${exam.date}</div>
+                            <div class="text-[11px] font-mono">${exam.startTime} - ${exam.endTime || '12:00'}</div>
+                        </td>
+                        <td class="p-2">
+                            <span class="font-bold">${exam.venue || 'Exam Hall'}</span>
+                            <span class="block text-[11px] text-gray-600">${exam.building || 'Block A'}</span>
+                        </td>
+                        <td class="p-2">
+                            <span class="px-1.5 py-0.5 bg-gray-200 border border-black text-[10px] font-bold">
+                                ${exam.examType || 'Final Exam'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Render Student Academic Results
+            const resContainer = document.getElementById('studentResultsList');
+            resContainer.innerHTML = '';
+
+            const myResults = state.results.filter(r => r.studentUserId == u.id || r.studentName === u.name);
+
+            if (myResults.length === 0) {
+                resContainer.innerHTML = `<div class="p-3 win-inset text-center text-xs font-bold">No examination grades published yet.</div>`;
+            } else {
+                myResults.forEach(r => {
+                    resContainer.innerHTML += `
+                        <div class="win-inset p-2 flex items-center justify-between bg-white">
+                            <div>
+                                <div class="font-bold text-win-navy">${r.courseCode || 'SWC3633'}</div>
+                                <div class="text-[11px]">${r.courseName || 'Course Title'}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-sm">${r.grade} (${r.marks}%)</div>
+                                <span class="px-1 text-[10px] font-bold border border-black ${r.status === 'PASS' ? 'bg-green-200 text-black' : 'bg-red-200 text-black'}">${r.status}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        function renderLecturerPortal() {
+            const tbody = document.getElementById('lecturerResultsTableBody');
+            tbody.innerHTML = '';
+
+            state.results.forEach(r => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-mono font-bold">RES-${r.id}</td>
+                        <td class="p-2 font-bold">
+                            <div>${r.studentName || 'Student'}</div>
+                            <div class="text-[10px] font-mono text-gray-600">${r.studentMatricNo || 'ST000'}</div>
+                        </td>
+                        <td class="p-2">${r.courseCode} - ${r.courseName || ''}</td>
+                        <td class="p-2 font-bold">${r.marks}</td>
+                        <td class="p-2 font-bold text-win-navy">${r.grade}</td>
+                        <td class="p-2">
+                            <span class="px-1 py-0.5 text-[10px] font-bold border border-black ${r.status === 'PASS' ? 'bg-green-200 text-black' : 'bg-red-200 text-black'}">${r.status}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filterResultsTable() {
+            const query = document.getElementById('resultSearchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#lecturerResultsTableBody tr');
+            rows.forEach(r => {
+                const text = r.innerText.toLowerCase();
+                r.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+
+        function renderAdminPortal() {
+            // Render Exams Table
+            const eBody = document.getElementById('adminExamsTableBody');
+            eBody.innerHTML = '';
+            state.examinations.forEach(e => {
+                eBody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-mono font-bold">#${e.id}</td>
+                        <td class="p-2 font-bold">${e.courseCode} <span class="block text-[11px] font-normal text-gray-600">${e.title}</span></td>
+                        <td class="p-2">${e.venue} <span class="block text-[11px] text-gray-600">${e.building}</span></td>
+                        <td class="p-2">${e.date}</td>
+                        <td class="p-2 font-mono">${e.startTime} - ${e.endTime}</td>
+                        <td class="p-2"><span class="px-1 bg-gray-200 border border-black font-bold">${e.examType}</span></td>
+                        <td class="p-2 text-right">
+                            <button onclick="handleDeleteExam(${e.id})" class="win-button px-2 py-0.5 text-red-700 font-bold">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Render Courses Grid (With Delete Button)
+            const cGrid = document.getElementById('coursesGrid');
+            cGrid.innerHTML = '';
+            state.courses.forEach(c => {
+                const courseId = c.id || c.course_id;
+                cGrid.innerHTML += `
+                    <div class="win-inset p-3 bg-white space-y-2 flex flex-col justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="bg-win-navy text-white px-1.5 font-bold text-[11px]">${c.code}</span>
+                                <span class="text-[11px] font-bold">${c.credits} Credits</span>
+                            </div>
+                            <h4 class="font-bold text-sm">${c.title}</h4>
+                            <div class="text-[11px] text-gray-600">${c.faculty}</div>
+                        </div>
+                        <div class="pt-2 border-t border-gray-200 flex justify-end">
+                            <button onclick="handleDeleteCourse(${courseId})" class="win-button px-2 py-0.5 text-xs text-red-700 font-bold">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Render Venues Grid (With Delete Button)
+            const vGrid = document.getElementById('venuesGrid');
+            vGrid.innerHTML = '';
+            state.venues.forEach(v => {
+                const venueId = v.venueId || v.id || v.venue_id;
+                vGrid.innerHTML += `
+                    <div class="win-inset p-3 bg-white space-y-2 flex flex-col justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-sm">${v.name}</span>
+                                <span class="bg-green-200 text-black px-1 border border-black text-[10px] font-bold">ACTIVE</span>
+                            </div>
+                            <div class="text-[11px] text-gray-600">${v.building}</div>
+                            <div class="text-[11px] font-bold text-win-navy">Capacity: ${v.capacity} Candidates</div>
+                        </div>
+                        <div class="pt-2 border-t border-gray-200 flex justify-end">
+                            <button onclick="handleDeleteVenue(${venueId})" class="win-button px-2 py-0.5 text-xs text-red-700 font-bold">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Render Registrations Table (With Delete Button)
+            const regBody = document.getElementById('registrationsTableBody');
+            regBody.innerHTML = '';
+            state.registrations.forEach(r => {
+                const regId = r.regId || r.id || r.registration_id;
+                regBody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-mono font-bold">#REG-${regId}</td>
+                        <td class="p-2 font-bold">${r.studentName}</td>
+                        <td class="p-2 font-mono">${r.matricNo}</td>
+                        <td class="p-2 font-bold text-win-navy">${r.courseCode} - ${r.courseName}</td>
+                        <td class="p-2">${r.semester}</td>
+                        <td class="p-2 text-gray-600">${r.registrationDate}</td>
+                        <td class="p-2 text-right">
+                            <button onclick="handleDeleteRegistration(${regId})" class="win-button px-2 py-0.5 text-red-700 font-bold">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Render Users Table (With Delete Button)
+            const uBody = document.getElementById('usersTableBody');
+            uBody.innerHTML = '';
+            state.users.forEach(u => {
+                const userId = u.id || u.user_id;
+                uBody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-mono font-bold">#${userId}</td>
+                        <td class="p-2 font-bold">${u.name}</td>
+                        <td class="p-2">${u.email}</td>
+                        <td class="p-2"><span class="px-1 text-[11px] font-bold border border-black ${u.role === 'Administrator' ? 'bg-purple-200' : u.role === 'Lecturer' ? 'bg-yellow-200' : 'bg-green-200'}">${u.role}</span></td>
+                        <td class="p-2 font-mono">${u.studentMatricNo || '-'}</td>
+                        <td class="p-2 text-right">
+                            <button onclick="handleDeleteUser(${userId})" class="win-button px-2 py-0.5 text-red-700 font-bold">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openExamSlipModal() {
+            const u = state.currentUser || state.users[0];
+            if (!u) return;
+            document.getElementById('slipStudentName').innerText = u.name;
+            document.getElementById('slipStudentId').innerText = u.studentMatricNo || 'ST001';
+
+            const qrData = encodeURIComponent(`EXAMSYNC-VERIFIED|STUDENT:${u.name}|MATRIC:${u.studentMatricNo || 'ST001'}|SESSION:2026/2027-1`);
+            document.getElementById('slipQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+
+            document.getElementById('examSlipModal').classList.remove('hidden');
+        }
+
+        function openGradeModal() {
+            const sSelect = document.getElementById('gradeStudentSelect');
+            sSelect.innerHTML = '';
+            state.users.filter(u => u.role === 'Student').forEach(s => {
+                sSelect.innerHTML += `<option value="${s.id}">${s.name} (${s.studentMatricNo || 'ST000'})</option>`;
+            });
+
+            const eSelect = document.getElementById('gradeExamSelect');
+            eSelect.innerHTML = '';
+            state.examinations.forEach(e => {
+                eSelect.innerHTML += `<option value="${e.id}">${e.courseCode} - ${e.title}</option>`;
+            });
+
+            document.getElementById('gradeModal').classList.remove('hidden');
+        }
+
+        async function handleSaveGrade(e) {
+            e.preventDefault();
+            const studentId = parseInt(document.getElementById('gradeStudentSelect').value);
+            const examId = parseInt(document.getElementById('gradeExamSelect').value);
+            const marks = parseFloat(document.getElementById('gradeMarksInput').value);
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/results`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId, examinationId: examId, marks })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to save grade to database');
+                await fetchAllData();
+                showToast('Student grade saved to MySQL database!', 'success');
+                closeModal('gradeModal');
+                if (state.currentUser && state.currentUser.role === 'Lecturer') renderLecturerPortal();
+                else renderAdminPortal();
+            } catch (err) {
+                console.error('Save grade error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        function openScheduleExamModal() {
+            const cSelect = document.getElementById('examCourseSelect');
+            cSelect.innerHTML = '';
+            state.courses.forEach(c => cSelect.innerHTML += `<option value="${c.id}">${c.code} - ${c.title}</option>`);
+
+            const vSelect = document.getElementById('examVenueSelect');
+            vSelect.innerHTML = '';
+            state.venues.forEach(v => vSelect.innerHTML += `<option value="${v.venueId || v.id}">${v.name} (${v.building})</option>`);
+
+            document.getElementById('scheduleExamModal').classList.remove('hidden');
+        }
+
+        async function handleScheduleExam(e) {
+            e.preventDefault();
+            const courseId = parseInt(document.getElementById('examCourseSelect').value);
+            const venueId = parseInt(document.getElementById('examVenueSelect').value);
+            const examDate = document.getElementById('examDateInput').value;
+            const startTime = document.getElementById('examStartTimeInput').value;
+            const endTime = document.getElementById('examEndTimeInput').value;
+            const examType = document.getElementById('examTypeInput').value;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/examinations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ courseId, venueId, examDate, startTime, endTime, examType })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to schedule exam in database');
+                await fetchAllData();
+                showToast('Examination saved to MySQL database!', 'success');
+                closeModal('scheduleExamModal');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Schedule exam error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        // --- DELETE HANDLERS FOR ADMIN ---
+        async function handleDeleteExam(id) {
+            if (!confirm(`Are you sure you want to delete examination schedule #${id}?`)) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/examinations/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to delete exam from database');
+                await fetchAllData();
+                showToast(`Exam #${id} deleted from database.`, 'info');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Delete exam error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function handleDeleteCourse(id) {
+            if (!confirm(`Are you sure you want to delete course #${id}?`)) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to delete course from database');
+                await fetchAllData();
+                showToast(`Course #${id} deleted from database.`, 'info');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Delete course error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function handleDeleteVenue(id) {
+            if (!confirm(`Are you sure you want to delete venue #${id}?`)) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/venues/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to delete venue from database');
+                await fetchAllData();
+                showToast(`Venue #${id} deleted from database.`, 'info');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Delete venue error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function handleDeleteRegistration(id) {
+            if (!confirm(`Are you sure you want to delete registration #${id}?`)) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/registrations/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to delete registration from database');
+                await fetchAllData();
+                showToast(`Registration #${id} deleted from database.`, 'info');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Delete registration error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+async function handleDeleteUser(id) {
+    if (state.currentUser && state.currentUser.id === id) {
+        showToast('Security Warning: You cannot delete your currently active user account.', 'error');
+        return;
+    }
+    if (!confirm(`Are you sure you want to delete user account #${id}?`)) return;
+    
+    try {
+        const res = await fetch(`${API_BASE_URL}/users/${id}`, { method: 'DELETE' });
+
+        // 1. Check if the server sent JSON before calling res.json()
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            throw new Error(`Server returned non-JSON response (${res.status} ${res.statusText})`);
+        }
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || 'Failed to delete user from database');
+        
+        await fetchAllData();
+        showToast(`User #${id} deleted from database.`, 'info');
+        renderAdminPortal();
+    } catch (err) {
+        console.error('Delete user error:', err);
+        showToast(`Database Error: ${err.message}`, 'error');
+    }
+}
+
+        function openAddCourseModal() { document.getElementById('addCourseModal').classList.remove('hidden'); }
+        async function handleAddCourse(e) {
+            e.preventDefault();
+            const code = document.getElementById('courseCodeInput').value.trim();
+            const title = document.getElementById('courseTitleInput').value.trim();
+            const credits = parseInt(document.getElementById('courseCreditsInput').value);
+            const faculty = document.getElementById('courseFacultyInput').value.trim();
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/courses`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, title, credits, faculty })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to add course to database');
+                await fetchAllData();
+                showToast('Course saved to MySQL database!', 'success');
+                closeModal('addCourseModal');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Add course error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        function openAddVenueModal() { document.getElementById('addVenueModal').classList.remove('hidden'); }
+        async function handleAddVenue(e) {
+            e.preventDefault();
+            const name = document.getElementById('venueNameInput').value.trim();
+            const building = document.getElementById('venueBuildingInput').value.trim();
+            const capacity = parseInt(document.getElementById('venueCapacityInput').value);
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/venues`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, building, capacity })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to add venue to database');
+                await fetchAllData();
+                showToast('Venue saved to MySQL database!', 'success');
+                closeModal('addVenueModal');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Add venue error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        function openAddRegistrationModal() {
+            const sSelect = document.getElementById('regStudentSelect');
+            sSelect.innerHTML = '';
+            state.users.filter(u => u.role === 'Student').forEach(s => sSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+
+            const cSelect = document.getElementById('regCourseSelect');
+            cSelect.innerHTML = '';
+            state.courses.forEach(c => cSelect.innerHTML += `<option value="${c.id}">${c.code} - ${c.title}</option>`);
+
+            document.getElementById('addRegistrationModal').classList.remove('hidden');
+        }
+
+        async function handleAddRegistration(e) {
+            e.preventDefault();
+            const studentId = parseInt(document.getElementById('regStudentSelect').value);
+            const courseId = parseInt(document.getElementById('regCourseSelect').value);
+            const semester = document.getElementById('regSemesterInput').value.trim();
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/registrations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId, courseId, semester })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to add registration to database');
+                await fetchAllData();
+                showToast('Registration saved to MySQL database!', 'success');
+                closeModal('addRegistrationModal');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Add registration error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        function openAddUserModal() { document.getElementById('addUserModal').classList.remove('hidden'); }
+        async function handleAddUser(e) {
+            e.preventDefault();
+            const fullName = document.getElementById('userFullNameInput').value.trim();
+            const email = document.getElementById('userEmailInput').value.trim();
+            const password = document.getElementById('userPasswordInput').value;
+            const role = document.getElementById('userRoleSelect').value;
+            const studentIdInput = document.getElementById('userMatricInput').value.trim();
+            const studentId = studentIdInput.length > 0 ? studentIdInput : null;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fullName, email, password, role, studentId })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to insert user into database');
+                await fetchAllData();
+                showToast('New user successfully saved in MySQL database!', 'success');
+                closeModal('addUserModal');
+                renderAdminPortal();
+            } catch (err) {
+                console.error('Add user error:', err);
+                showToast(`Database Error: ${err.message}`, 'error');
+            }
+        }
+
+        // --- UTILITY FUNCTIONS ---
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bg = type === 'success' ? 'bg-green-300 text-black' : type === 'error' ? 'bg-red-300 text-black' : 'bg-win-gray text-black';
+            toast.className = `win-outset ${bg} text-xs font-bold p-2 flex items-center justify-between pointer-events-auto border border-black`;
+            toast.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" class="ml-2 font-bold text-red-700">&times;</button>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 4000);
+        }
+    </script>
+</body>
+</html>
