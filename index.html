@@ -1057,11 +1057,14 @@
         function openExamSlipModal() {
             const u = state.currentUser || state.users[0];
             if (!u) return;
-            document.getElementById('slipStudentName').innerText = u.name;
-            document.getElementById('slipStudentId').innerText = u.studentMatricNo || 'ST001';
+            const matric = u.studentMatricNo || 'ST001';
 
-            const qrData = encodeURIComponent(`EXAMSYNC-VERIFIED|STUDENT:${u.name}|MATRIC:${u.studentMatricNo || 'ST001'}|SESSION:2026/2027-1`);
-            document.getElementById('slipQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+            document.getElementById('slipStudentName').innerText = u.name;
+            document.getElementById('slipStudentId').innerText = matric;
+
+            // QR now contains a link to the verification page instead of plain text
+            const verifyUrl = `${window.location.origin}/verify/${encodeURIComponent(matric)}`;
+            document.getElementById('slipQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
 
             document.getElementById('examSlipModal').classList.remove('hidden');
         }
