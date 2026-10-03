@@ -683,6 +683,7 @@
         // State initialized completely empty to strictly fetch live database records
         let state = {
             currentUser: null,
+            token: null,
             users: [],
             courses: [],
             venues: [],
@@ -692,10 +693,22 @@
             isOnline: false
         };
 
+        // --- JWT HELPER: adds the token to every request; logs out if it expires ---
+        let editingExamId = null;
+        async function apiFetch(url, options = {}) {
+            const headers = { ...(options.headers || {}) };
+            if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+            const res = await fetch(url, { ...options, headers });
+            if (res.status === 401 && state.token) {
+                logout();
+                showToast('Session expired. Please log in again.', 'error');
+            }
+            return res;
+        }
+
         // --- INITIALIZATION ---
         window.addEventListener('DOMContentLoaded', async () => {
             await checkApiStatus();
-            await fetchAllData();
         });
 
         async function checkApiStatus() {
@@ -712,12 +725,12 @@
         async function fetchAllData() {
             try {
                 const [uRes, cRes, vRes, eRes, rRes, regRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/users`),
-                    fetch(`${API_BASE_URL}/courses`),
-                    fetch(`${API_BASE_URL}/venues`),
-                    fetch(`${API_BASE_URL}/examinations`),
-                    fetch(`${API_BASE_URL}/results`),
-                    fetch(`${API_BASE_URL}/registrations`)
+                    apiFetch(`${API_BASE_URL}/users`),
+                    apiFetch(`${API_BASE_URL}/courses`),
+                    apiFetch(`${API_BASE_URL}/venues`),
+                    apiFetch(`${API_BASE_URL}/examinations`),
+                    apiFetch(`${API_BASE_URL}/results`),
+                    apiFetch(`${API_BASE_URL}/registrations`)
                 ]);
 
                 if (uRes.ok) state.users = await uRes.json();
@@ -745,7 +758,7 @@
 
             try {
                 // Send authentication request to Express server
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                const response = await apiFetch(`${API_BASE_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -755,6 +768,8 @@
 
                 if (response.ok && data.user) {
                     state.currentUser = data.user;
+                    state.token = data.token;
+                    await fetchAllData();
                     showToast(`Welcome back, ${data.user.name}!`, 'success');
                     renderUserSession();
                 } else {
@@ -768,6 +783,7 @@
 
         function logout() {
             state.currentUser = null;
+            state.token = null;
             document.getElementById('loginSection').classList.remove('hidden');
             document.getElementById('dashboardSection').classList.add('hidden');
             document.getElementById('userProfileHeader').classList.add('hidden');
@@ -954,6 +970,7 @@
                         <td class="p-2 font-mono">${e.startTime} - ${e.endTime}</td>
                         <td class="p-2"><span class="px-1 bg-gray-200 border border-black font-bold">${e.examType}</span></td>
                         <td class="p-2 text-right">
+                            <button onclick="openEditExamModal(${e.id})" class="win-button px-2 py-0.5 font-bold mr-1">Edit</button>
                             <button onclick="handleDeleteExam(${e.id})" class="win-button px-2 py-0.5 text-red-700 font-bold">
                                 Delete
                             </button>
@@ -1057,13 +1074,10 @@
         function openExamSlipModal() {
             const u = state.currentUser || state.users[0];
             if (!u) return;
-            const matric = u.studentMatricNo || 'ST001';
-
             document.getElementById('slipStudentName').innerText = u.name;
-            document.getElementById('slipStudentId').innerText = matric;
+            document.getElementById('slipStudentId').innerText = u.studentMatricNo || 'ST001';
 
-            // QR now contains a link to the verification page instead of plain text
-            const verifyUrl = `${window.location.origin}/verify/${encodeURIComponent(matric)}`;
+            const verifyUrl = `${window.location.origin}/verify/${encodeURIComponent(u.studentMatricNo || 'ST001')}`;
             document.getElementById('slipQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
 
             document.getElementById('examSlipModal').classList.remove('hidden');
@@ -1092,7 +1106,7 @@
             const marks = parseFloat(document.getElementById('gradeMarksInput').value);
 
             try {
-                const res = await fetch(`${API_BASE_URL}/results`, {
+                const res = await apiFetch(`${API_BASE_URL}/results`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, examinationId: examId, marks })
@@ -1110,7 +1124,21 @@
             }
         }
 
+        function openEditExamModal(id) {
+            const e = state.examinations.find(x => x.id === id);
+            if (!e) return;
+            openScheduleExamModal();
+            editingExamId = id;
+            document.getElementById('examCourseSelect').value = e.courseId;
+            document.getElementById('examVenueSelect').value = e.venueId;
+            document.getElementById('examDateInput').value = e.date;
+            document.getElementById('examStartTimeInput').value = String(e.startTime).slice(0, 5);
+            document.getElementById('examEndTimeInput').value = String(e.endTime).slice(0, 5);
+            document.getElementById('examTypeInput').value = e.examType;
+        }
+
         function openScheduleExamModal() {
+            editingExamId = null;
             const cSelect = document.getElementById('examCourseSelect');
             cSelect.innerHTML = '';
             state.courses.forEach(c => cSelect.innerHTML += `<option value="${c.id}">${c.code} - ${c.title}</option>`);
@@ -1132,15 +1160,16 @@
             const examType = document.getElementById('examTypeInput').value;
 
             try {
-                const res = await fetch(`${API_BASE_URL}/examinations`, {
-                    method: 'POST',
+                const res = await apiFetch(`${API_BASE_URL}/examinations${editingExamId ? '/' + editingExamId : ''}`, {
+                    method: editingExamId ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ courseId, venueId, examDate, startTime, endTime, examType })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to schedule exam in database');
                 await fetchAllData();
-                showToast('Examination saved to MySQL database!', 'success');
+                showToast(editingExamId ? 'Examination updated in MySQL database!' : 'Examination saved to MySQL database!', 'success');
+                editingExamId = null;
                 closeModal('scheduleExamModal');
                 renderAdminPortal();
             } catch (err) {
@@ -1153,7 +1182,7 @@
         async function handleDeleteExam(id) {
             if (!confirm(`Are you sure you want to delete examination schedule #${id}?`)) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/examinations/${id}`, { method: 'DELETE' });
+                const res = await apiFetch(`${API_BASE_URL}/examinations/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to delete exam from database');
                 await fetchAllData();
@@ -1168,7 +1197,7 @@
         async function handleDeleteCourse(id) {
             if (!confirm(`Are you sure you want to delete course #${id}?`)) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE' });
+                const res = await apiFetch(`${API_BASE_URL}/courses/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to delete course from database');
                 await fetchAllData();
@@ -1183,7 +1212,7 @@
         async function handleDeleteVenue(id) {
             if (!confirm(`Are you sure you want to delete venue #${id}?`)) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/venues/${id}`, { method: 'DELETE' });
+                const res = await apiFetch(`${API_BASE_URL}/venues/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to delete venue from database');
                 await fetchAllData();
@@ -1198,7 +1227,7 @@
         async function handleDeleteRegistration(id) {
             if (!confirm(`Are you sure you want to delete registration #${id}?`)) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/registrations/${id}`, { method: 'DELETE' });
+                const res = await apiFetch(`${API_BASE_URL}/registrations/${id}`, { method: 'DELETE' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to delete registration from database');
                 await fetchAllData();
@@ -1218,7 +1247,7 @@ async function handleDeleteUser(id) {
     if (!confirm(`Are you sure you want to delete user account #${id}?`)) return;
     
     try {
-        const res = await fetch(`${API_BASE_URL}/users/${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`${API_BASE_URL}/users/${id}`, { method: 'DELETE' });
 
         // 1. Check if the server sent JSON before calling res.json()
         const contentType = res.headers.get('content-type');
@@ -1249,7 +1278,7 @@ async function handleDeleteUser(id) {
             const faculty = document.getElementById('courseFacultyInput').value.trim();
 
             try {
-                const res = await fetch(`${API_BASE_URL}/courses`, {
+                const res = await apiFetch(`${API_BASE_URL}/courses`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code, title, credits, faculty })
@@ -1274,7 +1303,7 @@ async function handleDeleteUser(id) {
             const capacity = parseInt(document.getElementById('venueCapacityInput').value);
 
             try {
-                const res = await fetch(`${API_BASE_URL}/venues`, {
+                const res = await apiFetch(`${API_BASE_URL}/venues`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, building, capacity })
@@ -1310,7 +1339,7 @@ async function handleDeleteUser(id) {
             const semester = document.getElementById('regSemesterInput').value.trim();
 
             try {
-                const res = await fetch(`${API_BASE_URL}/registrations`, {
+                const res = await apiFetch(`${API_BASE_URL}/registrations`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, courseId, semester })
@@ -1338,7 +1367,7 @@ async function handleDeleteUser(id) {
             const studentId = studentIdInput.length > 0 ? studentIdInput : null;
 
             try {
-                const res = await fetch(`${API_BASE_URL}/users`, {
+                const res = await apiFetch(`${API_BASE_URL}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fullName, email, password, role, studentId })
